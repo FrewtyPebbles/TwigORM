@@ -15,6 +15,7 @@ class Statement:
     
     def where(self, comparisons:Comparison) -> Type[Statement]:
         self.preparations.extend(comparisons.preparations)
+        comparisons.db_type = self.table.database.db_type
         self.declarations += ["WHERE", comparisons.render()]
         return self
 
@@ -23,7 +24,12 @@ class Statement:
 
     def execute(self):
         cur = self.table.database.connection.cursor()
-        ret_val = cur.execute(self.render(), tuple(self.preparations)).fetchall()
+        ret_val = ""
+        if self.table.database.db_type == "sqlite":
+            ret_val = cur.execute(self.render(), tuple(self.preparations)).fetchall()
+        elif self.table.database.db_type == "mysql":
+            cur.execute(self.render(), tuple(self.preparations))
+            ret_val = cur.fetchall()
         cur.close()
         self.table.database.connection.commit()
         return ret_val
@@ -57,7 +63,10 @@ class Insert(Statement):
         for param in parameters:
             if type(param) == str:
                 self.preparations.append(param)
-                self.render_preps.append("?")
+                if table.database.db_type == "sqlite":
+                    self.render_preps.append("?")
+                elif table.database.db_type == "mysql":
+                    self.render_preps.append("%s")
             if type(param) == Statement:
                 self.preparations.extend(param.preparations)
                 self.render_preps.append("(" + param.render() + ")")
@@ -78,7 +87,10 @@ class Update(Statement):
         for key, val in updates.items():
             if type(val) in [str, int, bool]:
                 self.preparations.append(val)
-                self.render_preps.append(f"{key} = ?")
+                if table.database.db_type == "sqlite":
+                    self.render_preps.append(f"{key} = ?")
+                elif table.database.db_type == "mysql":
+                    self.render_preps.append(f"{key} = %s")
             if type(val) == Statement:
                 self.preparations.extend(val.preparations)
                 self.render_preps.append(f"{key} = (" + val.render() + ")")
