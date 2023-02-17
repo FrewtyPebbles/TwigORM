@@ -1,0 +1,15 @@
+LICENSE.txt
+MANIFEST.in
+README.md
+pyproject.toml
+setup.cfg
+src/TwigORM/__init__.py
+src/TwigORM.egg-info/PKG-INFO
+src/TwigORM.egg-info/SOURCES.txt
+src/TwigORM.egg-info/dependency_links.txt
+src/TwigORM.egg-info/top_level.txt
+src/TwigORM/database/__init__.py
+src/TwigORM/database/statement/__init__.py
+src/TwigORM/database/statement/comparison.py
+test/test_mysql.py
+test/test_sqlite.py

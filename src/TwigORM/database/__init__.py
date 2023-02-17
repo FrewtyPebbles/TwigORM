@@ -122,7 +122,7 @@ class Table:
 class Database:
     def __init__(self, db_type:str, db_address:str, user = "", password = "", database_name = "") -> None:
         if db_type.lower() == "sqlite":
-            self.connection = sqlite3.connect(db_address, timeout=10)
+            self.connection = sqlite3.connect(db_address, timeout=10, check_same_thread=False)
             
         elif db_type.lower() == "mysql":
             params = {}
@@ -137,6 +137,7 @@ class Database:
             
             self.connection = mysql.connector.connect(**params)
             
+        self.is_writing = False
         self.db_type = db_type
         self.tables:Dict[str, Table] = {}
 
