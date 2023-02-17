@@ -16,10 +16,12 @@ class Comparison:
 
         if type(rhs) == Statement:
             self.rhs = f"({rhs.render()})"
-        else:
+        elif type(rhs) == list:
             self.rhs = "?"
             self.db_type = "sqlite"
-            self.preparations.append(rhs)
+            self.preparations.append(rhs[0])
+        else:
+            self.rhs = rhs
 
         self.additions:List[Union[str, int, float, Comparison]] = []
     
@@ -45,6 +47,7 @@ class Comparison:
 
     def render(self) -> str:
         compiled_additions = ""
+        
         for an, addition in enumerate(self.additions):
             if issubclass(type(addition), Comparison):
                 if self.db_type == "mysql":
@@ -55,14 +58,14 @@ class Comparison:
             if an != len(self.additions) - 1:
                 compiled_additions += " "
                 
-        substitution_char = "?"
+        if self.rhs == "?":
 
-        if self.db_type == "mysql":
-            substitution_char = "%s"
-        elif self.db_type == "sqlite":
-            substitution_char = "?"
+            if self.db_type == "mysql":
+                self.rhs = "%s"
+            elif self.db_type == "sqlite":
+                self.rhs = "?"
         
-        return f"{self.lhs} {self.operator} {substitution_char} " + compiled_additions
+        return f"{self.lhs} {self.operator} {self.rhs} " + compiled_additions
 
 class Equal(Comparison):
     def __init__(self, lhs: Union[str, int, float, Comparison, Statement], rhs: Union[str, int, float, Comparison, Statement]) -> None:

@@ -65,8 +65,19 @@ class Column:
         self.type.db_type = self.db_type
         return f"""{self.name} {self.type.render()} {" ".join(self.constraints)}"""
 
+class ForeignKey:
+    def __init__(self, columns:List[str], table:str, constraint_columns: List[str]) -> None:
+        self.columns = columns
+        self.constraints = constraint_columns
+        self.db_type = "sqlite"
+        self.table = table
+        self.constraint_columns = constraint_columns
+
+    def __repr__(self) -> str:
+        return f"""FOREIGN KEY ({", ".join(self.columns)}) REFERENCES {self.table}({", ".join(self.constraint_columns)})"""
+
 class Table:
-    def __init__(self, database:Database, table_name:str, columns:Dict[str, Column]) -> None:
+    def __init__(self, database:Database, table_name:str, columns:Dict[str, Column], extra_constraints:List[ForeignKey]) -> None:
         self.database = database
         self.table_name = table_name
         self.columns = columns
@@ -77,15 +88,16 @@ class Table:
                 columns_str += f"{col}"
             else:
                 columns_str += f"{col}, "
-        createSQL = f"CREATE TABLE IF NOT EXISTS {table_name}({columns_str});"
+        createSQL = f"""CREATE TABLE IF NOT EXISTS {table_name}({columns_str}{", " + ", ".join([f"{x}" for x in extra_constraints]) if len(extra_constraints) != 0 else ""});"""
+        #print(createSQL)
         curs = database.connection.cursor()
         curs.execute(createSQL)
-        curs.close()
+        #curs.close()
         database.connection.commit()
         
     
-    def select(self, modifier = "", parameters: List[str | Statement | tuple] = ["*"]) -> Select:
-        return Select(self, modifier, parameters)
+    def select(self, modifier = "", parameters: List[str | Statement | tuple] = ["*"], alias:str = "", additional_tables:List[str] = "") -> Select:
+        return Select(self, modifier, parameters, alias, additional_tables)
 
     def insert(self, modifier = "", columns:List[str] = [], parameters: List[str | Statement | tuple] = [], alias = "") -> Select:
         return Insert(self, modifier, columns, parameters, alias)
@@ -97,20 +109,20 @@ class Table:
         return Delete(self)
 
     def drop(self):
-        SQL = f"DROP TABLE IF EXISTS {self.table_name}"
+        sql = f"DROP TABLE IF EXISTS {self.table_name}"
+        curs = self.database.connection.cursor()
         if self.database.db_type == "sqlite":
-            self.database.connection.execute(SQL)
+            curs.execute(sql)
         elif self.database.db_type == "mysql":
-            curs = self.database.connection.cursor()
-            curs.execute(SQL)
-            curs.close()
-            self.database.connection.commit()
+            curs.execute(sql)
+        #curs.close()
+        self.database.connection.commit()
 
 
 class Database:
     def __init__(self, db_type:str, db_address:str, user = "", password = "", database_name = "") -> None:
         if db_type.lower() == "sqlite":
-            self.connection = sqlite3.connect(db_address)
+            self.connection = sqlite3.connect(db_address, timeout=10)
             
         elif db_type.lower() == "mysql":
             params = {}
@@ -135,14 +147,24 @@ class Database:
         curs = self.connection.cursor()
         sql = f"CREATE DATABASE IF NOT EXISTS {database_name}"
         curs.execute(sql)
-        curs.close()
+        #curs.close()
         self.connection.commit()
 
-    def add_table(self, table_name:str, **columns:Column):
+    def add_table(self, table_name:str, extra_constraints:List[ForeignKey] = [], **columns:Column):
         for key in columns.keys():
             columns[key].name = key
-        self.tables[table_name] = Table(self, table_name, columns)
+        self.tables[table_name] = Table(self, table_name, columns, extra_constraints)
         return self
+
+    def drop(self, table:str):
+        sql = f"DROP TABLE IF EXISTS {table};"
+        curs = self.connection.cursor()
+        if self.db_type == "sqlite":
+            curs.execute(sql)
+        elif self.db_type == "mysql":
+            curs.execute(sql)
+        #curs.close()
+        self.connection.commit()
 
     def close(self):
         self.connection.close()
